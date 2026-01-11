@@ -9,27 +9,26 @@ jobs:
     timeout-minutes: 360
 
     steps:
-      - name: Install Desktop + XRDP
+      - name: Install Desktop & XRDP
         run: |
           sudo apt update
-          sudo apt install -y \
-            xfce4 xfce4-goodies \
-            xrdp dbus-x11 \
-            curl
+          sudo apt install -y xfce4 xfce4-goodies xrdp dbus-x11 curl
 
           sudo systemctl enable xrdp
-          sudo systemctl start xrdp
+          sudo systemctl restart xrdp
 
-      - name: Create RDP User
+      - name: Create RDP User (FIXED)
         run: |
           USERNAME=rdpuser
           PASSWORD='Rdp123!@#'
 
+          # Buat user
           sudo useradd -m $USERNAME
           echo "$USERNAME:$PASSWORD" | sudo chpasswd
           sudo usermod -aG sudo $USERNAME
 
-          echo "xfce4-session" > /home/$USERNAME/.xsession
+          # Set session XFCE (FIX permission)
+          echo "xfce4-session" | sudo tee /home/$USERNAME/.xsession > /dev/null
           sudo chown $USERNAME:$USERNAME /home/$USERNAME/.xsession
 
           echo "===================="
@@ -38,23 +37,24 @@ jobs:
           echo "Password: $PASSWORD"
           echo "===================="
 
-      - name: Install Tailscale
+      - name: Install & Connect Tailscale
         run: |
           curl -fsSL https://tailscale.com/install.sh | sh
           sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-linux-${{ github.run_id }}
 
           TS_IP=$(tailscale ip -4)
           echo "TAILSCALE_IP=$TS_IP" >> $GITHUB_ENV
+
           echo "Tailscale IP: $TS_IP"
 
       - name: Open RDP Port
         run: |
           sudo ufw allow 3389 || true
 
-      - name: Keep Alive
+      - name: Keep RDP Alive
         run: |
           echo "================================="
-          echo "RDP AKTIF (LINUX)"
+          echo "RDP LINUX AKTIF"
           echo "IP       : $TAILSCALE_IP"
           echo "PORT     : 3389"
           echo "USERNAME : rdpuser"
