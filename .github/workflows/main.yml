@@ -18,27 +18,42 @@ jobs:
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
           Restart-Service TermService -Force
 
-      - name: Create RDP User (FINAL)
-        run: |
-          $username = "Dika"
-          $password = "andikapwk"
+      - name: Create RDP User (ANTI ERROR)
+  run: |
+    $username = "mirza"
+    $password = "Mirza123!"
 
-          Write-Host "::add-mask::$password"
+    Write-Host "::add-mask::$password"
 
-          $securePass = ConvertTo-SecureString $password -AsPlainText -Force
+    # Validasi manual
+    if ($password.Length -lt 8) {
+      Write-Error "Password terlalu pendek"
+      exit 1
+    }
 
-          if (-not (Get-LocalUser -Name $username -ErrorAction SilentlyContinue)) {
-            New-LocalUser -Name $username -Password $securePass -AccountNeverExpires
-            Start-Sleep 3
-          }
+    $securePass = ConvertTo-SecureString $password -AsPlainText -Force
 
-          net localgroup Administrators $username /add
-          net localgroup "Remote Desktop Users" $username /add
+    # Hapus user kalau pernah gagal sebelumnya
+    if (Get-LocalUser -Name $username -ErrorAction SilentlyContinue) {
+      Remove-LocalUser -Name $username
+      Start-Sleep 2
+    }
 
-          Write-Host "=== RDP LOGIN ==="
-          Write-Host "Username: $username"
-          Write-Host "Password: $password"
+    New-LocalUser `
+      -Name $username `
+      -Password $securePass `
+      -AccountNeverExpires `
+      -PasswordNeverExpires `
+      -ErrorAction Stop
 
+    net localgroup Administrators $username /add
+    net localgroup "Remote Desktop Users" $username /add
+
+    Write-Host "USER BERHASIL DIBUAT"
+    Write-Host "Username: $username"
+    Write-Host "Password: $password"
+
+     
       - name: Install Tailscale
         run: |
           Invoke-WebRequest `
