@@ -34,24 +34,30 @@ jobs:
           echo "Password: $PASSWORD"
           echo "==============================="
 
-      - name: Install Ngrok (OFFICIAL & FIX)
+      - name: Install Ngrok (APT - STABLE)
         run: |
-          curl -fsSL https://ngrok.com/install.sh | sudo bash
+          curl -fsSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
+            | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+
+          echo "deb https://ngrok-agent.s3.amazonaws.com buster main" \
+            | sudo tee /etc/apt/sources.list.d/ngrok.list
+
+          sudo apt update
+          sudo apt install -y ngrok
           ngrok version
 
       - name: Start Ngrok TCP 3389
         run: |
           ngrok config add-authtoken ${{ secrets.NGROK_AUTH_TOKEN }}
 
-          # Jalankan ngrok di background
           nohup ngrok tcp 3389 > ngrok.log 2>&1 &
           sleep 10
 
-          # Ambil address ngrok
           ADDR=$(curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url')
 
           if [ -z "$ADDR" ] || [ "$ADDR" = "null" ]; then
-            echo "Gagal mendapatkan alamat ngrok"
+            echo "NGROK GAGAL START"
+            cat ngrok.log
             exit 1
           fi
 
@@ -67,5 +73,4 @@ jobs:
           echo "PASSWORD: Rdp123!"
           echo "================================="
 
-          # Tahan runner 6 jam
           sleep 21600
