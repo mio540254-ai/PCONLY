@@ -14,16 +14,21 @@ jobs:
           Set-ItemProperty `
             -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' `
             -Name "fDenyTSConnections" -Value 0
+
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
           Restart-Service TermService -Force
 
-      - name: Create RDP User (FINAL FIX)
+      - name: Create RDP User (FINAL STABLE)
         run: |
-          $username = "DIKA"
-          $password = "1000"
+          $username = "andika"
+
+          # Generate password yang DIJAMIN lolos policy Windows
+          Add-Type -AssemblyName System.Web
+          $password = [System.Web.Security.Membership]::GeneratePassword(12,3)
 
           Write-Host "::add-mask::$password"
 
+          # Hapus user kalau sudah ada
           if (Get-LocalUser -Name $username -ErrorAction SilentlyContinue) {
             Remove-LocalUser -Name $username
             Start-Sleep 2
@@ -38,18 +43,22 @@ jobs:
             -PasswordNeverExpires `
             -ErrorAction Stop
 
+          # Pakai net localgroup (PALING STABIL)
           net localgroup Administrators $username /add
           net localgroup "Remote Desktop Users" $username /add
 
-          Write-Host "=== RDP LOGIN ==="
-          Write-Host "Username: DIKA"
-          Write-Host "Password: 1000"
+          Write-Host "===================="
+          Write-Host "RDP LOGIN"
+          Write-Host "Username: $username"
+          Write-Host "Password: $password"
+          Write-Host "===================="
 
       - name: Install Tailscale
         run: |
           Invoke-WebRequest `
             -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi" `
             -OutFile "$env:TEMP\tailscale.msi"
+
           Start-Process msiexec.exe `
             -ArgumentList "/i `"$env:TEMP\tailscale.msi`" /quiet /norestart" `
             -Wait
@@ -68,20 +77,21 @@ jobs:
           }
 
           if (-not $ip) {
-            Write-Error "IP Tailscale gagal"
+            Write-Error "Gagal mendapatkan IP Tailscale"
             exit 1
           }
 
-          echo "TAILSCALE_IP=$ip" >> $env:GITHUB_ENV
           Write-Host "Tailscale IP: $ip"
+          echo "TAILSCALE_IP=$ip" >> $env:GITHUB_ENV
 
       - name: Keep Alive (6 Jam)
         run: |
-          Write-Host "========================"
+          Write-Host "================================"
           Write-Host "RDP AKTIF"
           Write-Host "IP   : $env:TAILSCALE_IP"
-          Write-Host "USER : DIKA"
-          Write-Host "========================"
+          Write-Host "USER : rdpuser"
+          Write-Host "PASS : lihat di step Create RDP User"
+          Write-Host "================================"
 
           $end = (Get-Date).AddHours(6)
           while (Get-Date -lt $end) {
