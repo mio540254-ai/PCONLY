@@ -1,4 +1,4 @@
-name: RDP-Linux-Ngrok
+name: RDP-Linux-Tailscale-Link
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ jobs:
       - name: Install Desktop & XRDP
         run: |
           sudo apt update
-          sudo apt install -y xfce4 xfce4-goodies xrdp dbus-x11 curl jq
+          sudo apt install -y xfce4 xfce4-goodies xrdp dbus-x11 curl
           sudo systemctl enable xrdp
           sudo systemctl restart xrdp
 
@@ -34,43 +34,26 @@ jobs:
           echo "Password: $PASSWORD"
           echo "==============================="
 
-      - name: Install Ngrok (APT - STABLE)
+      - name: Install Tailscale
         run: |
-          curl -fsSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
-            | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+          curl -fsSL https://tailscale.com/install.sh | sh
 
-          echo "deb https://ngrok-agent.s3.amazonaws.com buster main" \
-            | sudo tee /etc/apt/sources.list.d/ngrok.list
-
-          sudo apt update
-          sudo apt install -y ngrok
-          ngrok version
-
-      - name: Start Ngrok TCP 3389
+      - name: Login Tailscale (LINK)
         run: |
-          ngrok config add-authtoken ${{ secrets.NGROK_AUTH_TOKEN }}
-
-          nohup ngrok tcp 3389 > ngrok.log 2>&1 &
-          sleep 10
-
-          ADDR=$(curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url')
-
-          if [ -z "$ADDR" ] || [ "$ADDR" = "null" ]; then
-            echo "NGROK GAGAL START"
-            cat ngrok.log
-            exit 1
-          fi
-
-          echo "NGROK_ADDR=$ADDR" >> $GITHUB_ENV
-          echo "NGROK ADDRESS: $ADDR"
-
-      - name: Keep RDP Alive
-        run: |
+          sudo tailscale up
+          echo ""
+          echo "⬆⬆⬆ COPY LINK DI ATAS ⬆⬆⬆"
+          echo "Login pake browser kamu"
           echo "================================="
-          echo "RDP LINUX (NGROK) AKTIF"
-          echo "ADDRESS : $NGROK_ADDR"
-          echo "USERNAME: rdpuser"
-          echo "PASSWORD: Rdp123!"
+
+      - name: Show Tailscale IP
+        run: |
+          TS_IP=$(tailscale ip -4)
+          echo "================================="
+          echo "TAILSCALE IP : $TS_IP"
+          echo "PORT         : 3389"
+          echo "USERNAME     : rdpuser"
+          echo "PASSWORD     : Rdp123!"
           echo "================================="
 
           sleep 21600
