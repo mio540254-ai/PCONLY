@@ -20,7 +20,7 @@ jobs:
 
       - name: Create RDP User (FINAL)
         run: |
-          $username = "DIKA"
+          $username = "Dika"
           $password = "andikapwk"
 
           Write-Host "::add-mask::$password"
@@ -75,7 +75,7 @@ jobs:
           Write-Host "================================"
           Write-Host "RDP AKTIF"
           Write-Host "IP   : $env:TAILSCALE_IP"
-          Write-Host "User : DIKA"
+          Write-Host "User : Dika"
           Write-Host "================================"
 
           $end = (Get-Date).AddHours(6)
