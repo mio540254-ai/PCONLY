@@ -1,4 +1,4 @@
-name: RDP-Linux
+name: RDP-Linux-Ngrok
 
 on:
   workflow_dispatch:
@@ -12,22 +12,19 @@ jobs:
       - name: Install Desktop & XRDP
         run: |
           sudo apt update
-          sudo apt install -y xfce4 xfce4-goodies xrdp dbus-x11 curl
-
+          sudo apt install -y xfce4 xfce4-goodies xrdp dbus-x11 curl unzip
           sudo systemctl enable xrdp
           sudo systemctl restart xrdp
 
-      - name: Create RDP User (FIXED)
+      - name: Create RDP User
         run: |
           USERNAME=rdpuser
           PASSWORD='Rdp123!@#'
 
-          # Buat user
           sudo useradd -m $USERNAME
           echo "$USERNAME:$PASSWORD" | sudo chpasswd
           sudo usermod -aG sudo $USERNAME
 
-          # Set session XFCE (FIX permission)
           echo "xfce4-session" | sudo tee /home/$USERNAME/.xsession > /dev/null
           sudo chown $USERNAME:$USERNAME /home/$USERNAME/.xsession
 
@@ -37,28 +34,42 @@ jobs:
           echo "Password: $PASSWORD"
           echo "===================="
 
-      - name: Install & Connect Tailscale
+      - name: Install Ngrok
         run: |
-          curl -fsSL https://tailscale.com/install.sh | sh
-          sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=gh-linux-${{ github.run_id }}
+          curl -s https://ngrok-agent.s3.amazonaws.com/ngrok-linux-amd64.zip -o ngrok.zip
+          unzip ngrok.zip
+          sudo mv ngrok /usr/local/bin/ngrok
+          ngrok version
 
-          TS_IP=$(tailscale ip -4)
-          echo "TAILSCALE_IP=$TS_IP" >> $GITHUB_ENV
-
-          echo "Tailscale IP: $TS_IP"
-
-      - name: Open RDP Port
+      - name: Start Ngrok TCP 3389
         run: |
-          sudo ufw allow 3389 || true
+          ngrok authtoken ${{ secrets.NGROK_AUTH_TOKEN }}
+
+          # Jalankan ngrok di background
+          nohup ngrok tcp 3389 > ngrok.log 2>&1 &
+
+          sleep 10
+
+          # Ambil alamat TCP dari API lokal ngrok
+          NGROK_ADDR=$(curl -s http://127.0.0.1:4040/api/tunnels \
+            | jq -r '.tunnels[0].public_url' | sed 's#tcp://##')
+
+          if [ -z "$NGROK_ADDR" ]; then
+            echo "Gagal mendapatkan alamat ngrok"
+            exit 1
+          fi
+
+          echo "NGROK_ADDR=$NGROK_ADDR" >> $GITHUB_ENV
+          echo "Ngrok Address: $NGROK_ADDR"
 
       - name: Keep RDP Alive
         run: |
           echo "================================="
-          echo "RDP LINUX AKTIF"
-          echo "IP       : $TAILSCALE_IP"
-          echo "PORT     : 3389"
-          echo "USERNAME : rdpuser"
-          echo "PASSWORD : Rdp123!@#"
+          echo "RDP LINUX (NGROK)"
+          echo "ADDRESS : $NGROK_ADDR"
+          echo "PORT    : otomatis"
+          echo "USERNAME: rdpuser"
+          echo "PASSWORD: Rdp123!@#"
           echo "================================="
 
           sleep 21600
