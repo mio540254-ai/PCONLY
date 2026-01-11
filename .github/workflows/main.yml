@@ -1,0 +1,83 @@
+name: RDP
+
+on:
+  workflow_dispatch:
+
+jobs:
+  rdp:
+    runs-on: windows-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Enable RDP
+        run: |
+          Set-ItemProperty `
+            -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' `
+            -Name "fDenyTSConnections" -Value 0
+
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          Restart-Service TermService -Force
+
+      - name: Create RDP User (FINAL)
+        run: |
+          $username = "DIKA"
+          $password = "andikapwk"
+
+          Write-Host "::add-mask::$password"
+
+          $securePass = ConvertTo-SecureString $password -AsPlainText -Force
+
+          if (-not (Get-LocalUser -Name $username -ErrorAction SilentlyContinue)) {
+            New-LocalUser -Name $username -Password $securePass -AccountNeverExpires
+            Start-Sleep 3
+          }
+
+          net localgroup Administrators $username /add
+          net localgroup "Remote Desktop Users" $username /add
+
+          Write-Host "=== RDP LOGIN ==="
+          Write-Host "Username: $username"
+          Write-Host "Password: $password"
+
+      - name: Install Tailscale
+        run: |
+          Invoke-WebRequest `
+            -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi" `
+            -OutFile "$env:TEMP\tailscale.msi"
+
+          Start-Process msiexec.exe `
+            -ArgumentList "/i `"$env:TEMP\tailscale.msi`" /quiet /norestart" `
+            -Wait
+
+      - name: Connect Tailscale
+        run: |
+          & "$env:ProgramFiles\Tailscale\tailscale.exe" up `
+            --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} `
+            --hostname=gh-runner-$env:GITHUB_RUN_ID
+
+          $ip = $null
+          for ($i=0; $i -lt 10; $i++) {
+            $ip = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
+            if ($ip) { break }
+            Start-Sleep 3
+          }
+
+          if (-not $ip) {
+            Write-Error "Tailscale IP tidak dapat"
+            exit 1
+          }
+
+          echo "TAILSCALE_IP=$ip" >> $env:GITHUB_ENV
+          Write-Host "Tailscale IP: $ip"
+
+      - name: Keep Alive (6 Jam)
+        run: |
+          Write-Host "================================"
+          Write-Host "RDP AKTIF"
+          Write-Host "IP   : $env:TAILSCALE_IP"
+          Write-Host "User : DIKA"
+          Write-Host "================================"
+
+          $end = (Get-Date).AddHours(6)
+          while (Get-Date -lt $end) {
+            Start-Sleep 300          }
