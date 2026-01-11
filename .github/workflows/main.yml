@@ -14,52 +14,42 @@ jobs:
           Set-ItemProperty `
             -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' `
             -Name "fDenyTSConnections" -Value 0
-
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
           Restart-Service TermService -Force
 
-      - name: Create RDP User (ANTI ERROR)
-  run: |
-    $username = "mirza"
-    $password = "Mirza123!"
+      - name: Create RDP User (FINAL FIX)
+        run: |
+          $username = "DIKA"
+          $password = "Dika123!"
 
-    Write-Host "::add-mask::$password"
+          Write-Host "::add-mask::$password"
 
-    # Validasi manual
-    if ($password.Length -lt 8) {
-      Write-Error "Password terlalu pendek"
-      exit 1
-    }
+          if (Get-LocalUser -Name $username -ErrorAction SilentlyContinue) {
+            Remove-LocalUser -Name $username
+            Start-Sleep 2
+          }
 
-    $securePass = ConvertTo-SecureString $password -AsPlainText -Force
+          $securePass = ConvertTo-SecureString $password -AsPlainText -Force
 
-    # Hapus user kalau pernah gagal sebelumnya
-    if (Get-LocalUser -Name $username -ErrorAction SilentlyContinue) {
-      Remove-LocalUser -Name $username
-      Start-Sleep 2
-    }
+          New-LocalUser `
+            -Name $username `
+            -Password $securePass `
+            -AccountNeverExpires `
+            -PasswordNeverExpires `
+            -ErrorAction Stop
 
-    New-LocalUser `
-      -Name $username `
-      -Password $securePass `
-      -AccountNeverExpires `
-      -PasswordNeverExpires `
-      -ErrorAction Stop
+          net localgroup Administrators $username /add
+          net localgroup "Remote Desktop Users" $username /add
 
-    net localgroup Administrators $username /add
-    net localgroup "Remote Desktop Users" $username /add
+          Write-Host "=== RDP LOGIN ==="
+          Write-Host "Username: DIKA"
+          Write-Host "Password: Dika123!"
 
-    Write-Host "USER BERHASIL DIBUAT"
-    Write-Host "Username: $username"
-    Write-Host "Password: $password"
-
-     
       - name: Install Tailscale
         run: |
           Invoke-WebRequest `
             -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi" `
             -OutFile "$env:TEMP\tailscale.msi"
-
           Start-Process msiexec.exe `
             -ArgumentList "/i `"$env:TEMP\tailscale.msi`" /quiet /norestart" `
             -Wait
@@ -78,7 +68,7 @@ jobs:
           }
 
           if (-not $ip) {
-            Write-Error "Tailscale IP tidak dapat"
+            Write-Error "IP Tailscale gagal"
             exit 1
           }
 
@@ -87,12 +77,13 @@ jobs:
 
       - name: Keep Alive (6 Jam)
         run: |
-          Write-Host "================================"
+          Write-Host "========================"
           Write-Host "RDP AKTIF"
           Write-Host "IP   : $env:TAILSCALE_IP"
-          Write-Host "User : Dika"
-          Write-Host "================================"
+          Write-Host "USER : DIKA"
+          Write-Host "========================"
 
           $end = (Get-Date).AddHours(6)
           while (Get-Date -lt $end) {
-            Start-Sleep 300          }
+            Start-Sleep 300
+          }
