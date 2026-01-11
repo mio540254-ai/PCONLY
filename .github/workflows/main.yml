@@ -20,7 +20,7 @@ jobs:
       - name: Create RDP User (FINAL FIX)
         run: |
           $username = "DIKA"
-          $password = "Dika123!"
+          $password = "1000"
 
           Write-Host "::add-mask::$password"
 
@@ -43,7 +43,7 @@ jobs:
 
           Write-Host "=== RDP LOGIN ==="
           Write-Host "Username: DIKA"
-          Write-Host "Password: Dika123!"
+          Write-Host "Password: 1000"
 
       - name: Install Tailscale
         run: |
